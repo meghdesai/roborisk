@@ -1,0 +1,17 @@
+name: Price Ingest
+
+on:
+  schedule:
+    - cron: "* * * * *"
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - run: |
+          pip install polygon-api-client sqlite-utils
+          python -c "from roborisk.datafeed import ingest; ingest(['AAPL','MSFT','SPY','QQQ','TSLA'])"

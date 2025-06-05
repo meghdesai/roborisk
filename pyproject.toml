@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "roborisk"
+version = "0.1.0"
+description = "Roborisk data ingestion"
+authors = ["Roborisk Team"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+polygon-api-client = "*"
+pydantic = "*"
+python-dotenv = "*"
+numpy = "*"
+numba = "*"
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

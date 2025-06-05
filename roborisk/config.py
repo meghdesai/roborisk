@@ -1,0 +1,12 @@
+from functools import lru_cache
+from pydantic import BaseSettings
+from dotenv import load_dotenv
+
+load_dotenv()
+
+class Settings(BaseSettings):
+    POLYGON_API_KEY: str
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()
