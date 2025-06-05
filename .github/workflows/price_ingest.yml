@@ -1,17 +1,26 @@
+# .github/workflows/price_ingest.yml
 name: Price Ingest
 
 on:
   schedule:
-    - cron: "* * * * *"
+    - cron: '0 5 * * *'          # once a day at 05:00 UTC  (≈ midnight ET)
+  workflow_dispatch:
 
 jobs:
   ingest:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
-      - run: |
-          pip install polygon-api-client sqlite-utils pydantic python-dotenv
-          python -c "from roborisk.datafeed import ingest; ingest(['AAPL','MSFT','SPY','QQQ','TSLA'])"
+          python-version: '3.11'
+      - name: Install project
+        run: pip install .        # pulls ALL deps incl. pydantic-settings
+      - name: Run ingest
+        env:
+          POLYGON_API_KEY: ${{ secrets.POLYGON_API_KEY }}
+        run: |
+          python - <<'PY'
+          from roborisk.datafeed import ingest
+          ingest(['AAPL', 'MSFT', 'SPY', 'QQQ', 'TSLA'])
+          PY
