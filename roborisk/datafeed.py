@@ -1,9 +1,10 @@
+# roborisk/datafeed.py
 from __future__ import annotations
 
 import sqlite3
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, List
 
 from polygon import RESTClient
 
@@ -15,44 +16,55 @@ DB_PATH = Path(__file__).resolve().parent / "prices.db"
 def _get_connection() -> sqlite3.Connection:
     conn = sqlite3.connect(DB_PATH)
     conn.execute(
-        "CREATE TABLE IF NOT EXISTS prices("
-        "ticker TEXT,"
-        " ts_utc INTEGER,"
-        " open REAL,"
-        " high REAL,"
-        " low REAL,"
-        " close REAL,"
-        " volume INTEGER,"
-        " PRIMARY KEY(ticker, ts_utc)"
-        ")"
+        """
+        CREATE TABLE IF NOT EXISTS prices (
+            ticker  TEXT,
+            ts_utc  INTEGER,
+            open    REAL,
+            high    REAL,
+            low     REAL,
+            close   REAL,
+            volume  INTEGER,
+            PRIMARY KEY (ticker, ts_utc)
+        )
+        """
     )
     return conn
 
 
-def fetch_minute_bars(ticker: str, lookback_min: int = 1) -> Iterable:
+def fetch_daily_bars(ticker: str, lookback_days: int = 5) -> Iterable:
+    """
+    Free-tier helper: returns up to `lookback_days` daily bars
+    *ending yesterday* so we never query the still-open session.
+    """
     settings = get_settings()
     client = RESTClient(api_key=settings.POLYGON_API_KEY)
-    end = datetime.now(tz=timezone.utc)
-    start = end - timedelta(minutes=lookback_min)
+
+    end: date = datetime.now(tz=timezone.utc).date() - timedelta(days=1)
+    start: date = end - timedelta(days=lookback_days - 1)
+
+    # ISO-8601 strings are the documented format
     return client.list_aggs(
-        ticker,
-        1,
-        "minute",
-        int(start.timestamp()),
-        int(end.timestamp()),
+        ticker=ticker,
+        multiplier=1,
+        timespan="day",        # ← daily bars are free
+        from_=start.isoformat(),
+        to=end.isoformat(),
+        limit=lookback_days,
     )
 
 
-def ingest(tickers: list[str]) -> None:
+def ingest(tickers: List[str], lookback_days: int = 5) -> None:
     conn = _get_connection()
     cur = conn.cursor()
+
     for ticker in tickers:
-        for bar in fetch_minute_bars(ticker, lookback_min=60):
+        for bar in fetch_daily_bars(ticker, lookback_days):
             cur.execute(
                 "INSERT OR IGNORE INTO prices VALUES (?,?,?,?,?,?,?)",
                 (
                     ticker,
-                    bar.timestamp,
+                    bar.timestamp,  # ms since epoch (already in bar)
                     bar.open,
                     bar.high,
                     bar.low,
@@ -60,6 +72,8 @@ def ingest(tickers: list[str]) -> None:
                     bar.volume,
                 ),
             )
+        print(f"✅ {ticker} up-to-date")
+
     conn.commit()
     conn.close()
 
@@ -67,4 +81,5 @@ def ingest(tickers: list[str]) -> None:
 if __name__ == "__main__":
     import sys
 
-    ingest(sys.argv[1:])
+    # Example: python -m roborisk.datafeed AAPL MSFT NVDA -- ingests last 5 days
+    ingest(sys.argv[1:] or ["AAPL"])
