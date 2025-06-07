@@ -17,6 +17,7 @@ numba = "*"
 requests = "*"
 rich = "*"
 typer = {version = "*", extras = ["all"]}
+openai = "*"
 
 [tool.poetry.dev-dependencies]
 
