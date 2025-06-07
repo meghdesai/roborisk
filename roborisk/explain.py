@@ -1,4 +1,4 @@
-import openai
+from openai import openai
 from .config import get_settings
 
 
