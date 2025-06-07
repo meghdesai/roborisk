@@ -1,34 +1,22 @@
 # roborisk/datafeed.py
 from __future__ import annotations
 
-import sqlite3
-from pathlib import Path
 from typing import Iterable, List
+
+from pymongo import MongoClient, ASCENDING
 
 from polygon import RESTClient
 
 from .config import get_settings
 
-DB_PATH = Path(__file__).resolve().parents[1] / "prices.db"
 
-
-def _get_connection() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_PATH)
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS prices (
-            ticker  TEXT,
-            ts_utc  INTEGER,
-            open    REAL,
-            high    REAL,
-            low     REAL,
-            close   REAL,
-            volume  INTEGER,
-            PRIMARY KEY (ticker, ts_utc)
-        )
-        """
-    )
-    return conn
+def _get_collection():
+    settings = get_settings()
+    client = MongoClient(settings.MONGODB_URI)
+    db = client["roborisk"]
+    coll = db["prices"]
+    coll.create_index([("ticker", ASCENDING), ("ts_utc", ASCENDING)], unique=True)
+    return coll
 
 
 def fetch_daily_bars(ticker: str, start: str, end: str) -> Iterable:
@@ -46,27 +34,24 @@ def fetch_daily_bars(ticker: str, start: str, end: str) -> Iterable:
 
 
 def ingest(tickers: List[str], start: str = "2023-03-01", end: str = "2023-06-07") -> None:
-    conn = _get_connection()
-    cur = conn.cursor()
+    coll = _get_collection()
 
     for ticker in tickers:
         for bar in fetch_daily_bars(ticker, start, end):
-            cur.execute(
-                "INSERT OR IGNORE INTO prices VALUES (?,?,?,?,?,?,?)",
-                (
-                    ticker,
-                    bar.timestamp,  # ms since epoch (already in bar)
-                    bar.open,
-                    bar.high,
-                    bar.low,
-                    bar.close,
-                    bar.volume,
-                ),
+            coll.update_one(
+                {"ticker": ticker, "ts_utc": bar.timestamp},
+                {
+                    "$set": {
+                        "open": bar.open,
+                        "high": bar.high,
+                        "low": bar.low,
+                        "close": bar.close,
+                        "volume": bar.volume,
+                    }
+                },
+                upsert=True,
             )
         print(f"✅ {ticker} up-to-date")
-
-    conn.commit()
-    conn.close()
 
 
 if __name__ == "__main__":

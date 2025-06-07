@@ -1,11 +1,17 @@
 import csv
-import sqlite3
-from pathlib import Path
+from pymongo import MongoClient
 from datetime import datetime, timedelta
 
 import numpy as np
 
-DB_PATH = Path(__file__).resolve().parents[1] / "prices.db"
+from .config import get_settings
+
+
+def _get_collection():
+    settings = get_settings()
+    client = MongoClient(settings.MONGODB_URI)
+    db = client["roborisk"]
+    return db["prices"]
 
 
 def _load_portfolio(path: str):
@@ -22,17 +28,19 @@ def _load_portfolio(path: str):
 
 def _get_returns_and_price(ticker: str, as_of_dt: datetime, lookback_days: int):
     end_ts = int((as_of_dt + timedelta(days=1)).timestamp() * 1000)
-    conn = sqlite3.connect(DB_PATH)
-    cur = conn.cursor()
-    cur.execute(
-        "SELECT ts_utc, close FROM prices WHERE ticker=? AND ts_utc <= ? ORDER BY ts_utc DESC LIMIT ?",
-        (ticker, end_ts, lookback_days + 1),
+    coll = _get_collection()
+    cursor = (
+        coll.find(
+            {"ticker": ticker, "ts_utc": {"$lte": end_ts}},
+            {"_id": 0, "ts_utc": 1, "close": 1},
+        )
+        .sort("ts_utc", -1)
+        .limit(lookback_days + 1)
     )
-    rows = cur.fetchall()[::-1]
-    conn.close()
+    rows = list(cursor)[::-1]
     if len(rows) < lookback_days + 1:
         raise ValueError(f"not enough data for {ticker}")
-    closes = np.array([r[1] for r in rows], dtype=float)
+    closes = np.array([r["close"] for r in rows], dtype=float)
     returns = np.diff(np.log(closes))
     return returns, closes[-1]
 
