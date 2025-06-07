@@ -1,11 +1,10 @@
 from functools import lru_cache
-from pydantic_settings import BaseSettings   # <-- updated import
-from dotenv import load_dotenv
+from pydantic_settings import BaseSettings
 
-load_dotenv()
 
-class Settings(BaseSettings):
+class Settings(BaseSettings, env_file=".env"):
     POLYGON_API_KEY: str
+    OPENROUTER_API_KEY: str
 
 @lru_cache
 def get_settings() -> Settings:
