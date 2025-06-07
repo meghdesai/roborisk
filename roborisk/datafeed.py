@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import sqlite3
-from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterable, List
 
@@ -10,7 +9,7 @@ from polygon import RESTClient
 
 from .config import get_settings
 
-DB_PATH = Path(__file__).resolve().parent / "prices.db"
+DB_PATH = Path(__file__).resolve().parents[1] / "prices.db"
 
 
 def _get_connection() -> sqlite3.Connection:
@@ -32,34 +31,26 @@ def _get_connection() -> sqlite3.Connection:
     return conn
 
 
-def fetch_daily_bars(ticker: str, lookback_days: int = 5) -> Iterable:
-    """
-    Free-tier helper: returns up to `lookback_days` daily bars
-    *ending yesterday* so we never query the still-open session.
-    """
+def fetch_daily_bars(ticker: str, start: str, end: str) -> Iterable:
+    """Fetch daily bars for ``ticker`` between ``start`` and ``end`` (inclusive)."""
     settings = get_settings()
     client = RESTClient(api_key=settings.POLYGON_API_KEY)
 
-    end: date = datetime.now(tz=timezone.utc).date() - timedelta(days=1)
-    start: date = end - timedelta(days=lookback_days - 1)
-
-    # ISO-8601 strings are the documented format
     return client.list_aggs(
         ticker=ticker,
         multiplier=1,
-        timespan="day",        # ← daily bars are free
-        from_=start.isoformat(),
-        to=end.isoformat(),
-        limit=lookback_days,
+        timespan="day",
+        from_=start,
+        to=end,
     )
 
 
-def ingest(tickers: List[str], lookback_days: int = 5) -> None:
+def ingest(tickers: List[str], start: str = "2023-03-01", end: str = "2023-06-07") -> None:
     conn = _get_connection()
     cur = conn.cursor()
 
     for ticker in tickers:
-        for bar in fetch_daily_bars(ticker, lookback_days):
+        for bar in fetch_daily_bars(ticker, start, end):
             cur.execute(
                 "INSERT OR IGNORE INTO prices VALUES (?,?,?,?,?,?,?)",
                 (
@@ -81,5 +72,5 @@ def ingest(tickers: List[str], lookback_days: int = 5) -> None:
 if __name__ == "__main__":
     import sys
 
-    # Example: python -m roborisk.datafeed AAPL MSFT NVDA -- ingests last 5 days
-    ingest(sys.argv[1:] or ["AAPL"])
+    # Example: python -m roborisk.datafeed AAPL MSFT
+    ingest(sys.argv[1:] or ["AAPL"])  # default date range

@@ -14,9 +14,15 @@ pydantic-settings = "*"
 python-dotenv = "*"
 numpy = "*"
 numba = "*"
+requests = "*"
+rich = "*"
+typer = {version = "*", extras = ["all"]}
 
 [tool.poetry.dev-dependencies]
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+roborisk = "cli:main"
