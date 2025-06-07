@@ -1,11 +1,13 @@
 # roborisk/datafeed.py
 from __future__ import annotations
 
+from datetime import date, timedelta
 from typing import Iterable, List
 
 from pymongo import MongoClient, ASCENDING
 
-from polygon import RESTClient
+import pandas as pd
+import yfinance as yf
 
 from .config import get_settings
 
@@ -19,39 +21,58 @@ def _get_collection():
     return coll
 
 
-def fetch_daily_bars(ticker: str, start: str, end: str) -> Iterable:
-    """Fetch daily bars for ``ticker`` between ``start`` and ``end`` (inclusive)."""
-    settings = get_settings()
-    client = RESTClient(api_key=settings.POLYGON_API_KEY)
+def fetch_daily_bars(ticker: str, start: str, end: str) -> Iterable[pd.Series]:
+    """Fetch daily bars for ``ticker`` between ``start`` and ``end`` (inclusive)
+    from Yahoo Finance."""
 
-    return client.list_aggs(
-        ticker=ticker,
-        multiplier=1,
-        timespan="day",
-        from_=start,
-        to=end,
+    df = yf.download(
+        tickers=ticker,
+        start=start,
+        end=(pd.to_datetime(end) + pd.Timedelta(days=1)).strftime("%Y-%m-%d"),
+        progress=False,
+        interval="1d",
     )
 
+    df = df.reset_index()
+    df.rename(columns=str.lower, inplace=True)
+    df["timestamp"] = df["date"].astype("int64") // 10**6
+    return df.itertuples(index=False)
 
-def ingest(tickers: List[str], start: str = "2023-03-01", end: str = "2023-06-07") -> None:
+
+DEFAULT_END = date(2024, 1, 31)
+DEFAULT_START = DEFAULT_END - timedelta(days=359)
+
+
+def ingest(
+    tickers: List[str],
+    start: str = DEFAULT_START.isoformat(),
+    end: str = DEFAULT_END.isoformat(),
+) -> None:
     coll = _get_collection()
 
     for ticker in tickers:
         for bar in fetch_daily_bars(ticker, start, end):
             coll.update_one(
-                {"ticker": ticker, "ts_utc": bar.timestamp},
+                {"ticker": ticker, "ts_utc": int(bar.timestamp)},
                 {
                     "$set": {
-                        "open": bar.open,
-                        "high": bar.high,
-                        "low": bar.low,
-                        "close": bar.close,
-                        "volume": bar.volume,
+                        "open": float(bar.open),
+                        "high": float(bar.high),
+                        "low": float(bar.low),
+                        "close": float(bar.close),
+                        "volume": float(bar.volume),
                     }
                 },
                 upsert=True,
             )
         print(f"✅ {ticker} up-to-date")
+
+
+def ingest_date_range(ticker: str, start: str, end: str) -> None:
+    """Convenience wrapper to ingest data for a single ``ticker`` between the
+    provided ``start`` and ``end`` dates."""
+
+    ingest([ticker], start=start, end=end)
 
 
 if __name__ == "__main__":
