@@ -2,7 +2,7 @@ import typer
 from rich import print
 from rich.panel import Panel
 
-from roborisk.datafeed import ingest as ingest_prices
+from roborisk.datafeed import ingest as ingest_prices, DEFAULT_START, DEFAULT_END
 from roborisk.risk import monte_carlo_var
 from roborisk.explain import explain_var
 
@@ -10,9 +10,14 @@ app = typer.Typer(add_completion=False)
 
 
 @app.command()
-def ingest(tickers: str):
-    tickers_list = [t.strip() for t in tickers.split(',') if t.strip()]
-    ingest_prices(tickers_list)
+def ingest(
+    tickers: str,
+    start: str = DEFAULT_START.isoformat(),
+    end: str = DEFAULT_END.isoformat(),
+):
+    """Ingest price data for ``tickers`` between ``start`` and ``end``."""
+    tickers_list = [t.strip() for t in tickers.split(",") if t.strip()]
+    ingest_prices(tickers_list, start=start, end=end)
 
 
 @app.command()
