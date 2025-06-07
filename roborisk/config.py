@@ -5,6 +5,7 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings, env_file=".env"):
     POLYGON_API_KEY: str
     OPENROUTER_API_KEY: str
+    MONGODB_URI: str
 
 @lru_cache
 def get_settings() -> Settings:
