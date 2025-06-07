@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
 
@@ -29,27 +29,22 @@ def _get_connection() -> sqlite3.Connection:
     return conn
 
 
-def fetch_minute_bars(ticker: str, lookback_min: int = 1) -> Iterable:
+
+def fetch_daily_bars(ticker: str, start: str, end: str) -> Iterable:
     settings = get_settings()
     client = RESTClient(api_key=settings.POLYGON_API_KEY)
-    end = datetime.now(tz=timezone.utc)
-    start = end - timedelta(minutes=lookback_min)
-    return client.list_aggs(
-        ticker,
-        1,
-        "minute",
-        int(start.timestamp()),
-        int(end.timestamp()),
-    )
+    return client.list_aggs(ticker, 1, "day", start, end)
 
 
-def ingest(tickers: list[str]) -> None:
+def ingest(
+    tickers: list[str], start: str = "2023-03-01", end: str = "2023-06-07"
+) -> None:
     conn = _get_connection()
     cur = conn.cursor()
     for ticker in tickers:
-        for bar in fetch_minute_bars(ticker, lookback_min=60):
+        for bar in fetch_daily_bars(ticker, start, end):
             cur.execute(
-                "INSERT OR IGNORE INTO prices VALUES (?,?,?,?,?,?,?)",
+                "INSERT OR REPLACE INTO prices VALUES (?,?,?,?,?,?,?)",
                 (
                     ticker,
                     bar.timestamp,
