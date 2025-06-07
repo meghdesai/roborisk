@@ -1,8 +1,9 @@
-# roborisk
+# RoboRisk
 
-Install with Poetry and run the data ingest:
-
+Quick start:
 ```bash
-poetry install
-poetry run python -m roborisk.datafeed AAPL MSFT
+pip install -e .
+roborisk ingest --tickers AAPL,MSFT,SPY
+roborisk var --portfolio data/portfolio.csv
+roborisk explain --portfolio data/portfolio.csv
 ```

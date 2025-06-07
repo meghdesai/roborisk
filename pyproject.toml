@@ -9,9 +9,16 @@ readme = "README.md"
 python = "^3.11"
 polygon-api-client = "*"
 pydantic = "*"
+pydantic-settings = "*"
 python-dotenv = "*"
 numpy = "*"
 numba = "*"
+requests = "*"
+rich = "*"
+typer = "*"
+
+[tool.poetry.scripts]
+roborisk = "cli:app"
 
 [tool.poetry.dev-dependencies]
 
