@@ -78,14 +78,10 @@ def ingest(
 
 
 def ingest_date_range(ticker: str, start: str, end: str) -> None:
-    """Convenience wrapper to ingest data for a single ``ticker`` between the
-    provided ``start`` and ``end`` dates."""
-
     ingest([ticker], start=start, end=end)
 
 
 if __name__ == "__main__":
     import sys
 
-    # Example: python -m roborisk.datafeed AAPL MSFT
-    ingest(sys.argv[1:] or ["AAPL"])  # default date range
+    ingest(sys.argv[1:])
