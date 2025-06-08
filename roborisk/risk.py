@@ -30,10 +30,6 @@ def _load_portfolio(path: str):
 def _get_returns_and_price(ticker: str,
                            as_of_dt: datetime,
                            lookback_days: int):
-    """
-    Return log-returns and close price *ending exactly on as_of_dt*.
-    The query window is [as_of_dt-lookback_days, as_of_dt] inclusive.
-    """
     next_midnight = as_of_dt + timedelta(days=1)
     end_exclusive = int(next_midnight.timestamp() * 1000)
 
@@ -56,7 +52,7 @@ def _get_returns_and_price(ticker: str,
 
 def monte_carlo_var(
     portfolio_path: str,
-    as_of: Union[str, datetime] = "2023-06-07",   # <-- accept dt object too
+    as_of: Union[str, datetime] = "2023-06-07", 
     lookback_days: int = 60,
     simulations: int = 1000,
     alpha: float = 0.95,
