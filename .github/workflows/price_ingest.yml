@@ -1,9 +1,9 @@
 # .github/workflows/price_ingest.yml
 name: Price Ingest
-on:
-  schedule:
-    - cron: '0 5 * * *'        # daily 05:00 UTC
-  workflow_dispatch:
+# on:
+#  schedule:
+#    - cron: '0 5 * * *'        # daily 05:00 UTC
+#  workflow_dispatch:
 
 jobs:
   ingest:
