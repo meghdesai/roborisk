@@ -10,7 +10,8 @@ import pandas as pd
 import yfinance as yf
 
 from .config import get_settings
-
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
 
 def _get_collection():
     settings = get_settings()
@@ -21,7 +22,7 @@ def _get_collection():
     return coll
 
 
-def fetch_daily_bars(ticker: str, start: str, end: str) -> Iterable[pd.Series]:
+def fetch_daily_bars(ticker: str, start: str, end: str) -> Iterable[dict]:
     """Fetch daily bars for ``ticker`` between ``start`` and ``end`` (inclusive)
     from Yahoo Finance."""
 
@@ -31,13 +32,21 @@ def fetch_daily_bars(ticker: str, start: str, end: str) -> Iterable[pd.Series]:
         end=(pd.to_datetime(end) + pd.Timedelta(days=1)).strftime("%Y-%m-%d"),
         progress=False,
         interval="1d",
+        auto_adjust=True, 
     )
 
     df = df.reset_index()
     df.rename(columns=str.lower, inplace=True)
     df["timestamp"] = df["date"].astype("int64") // 10**6
-    return df.itertuples(index=False)
-
+    for _, row in df.iterrows():
+        yield {
+            "open": row["open"],
+            "high": row["high"],
+            "low": row["low"],
+            "close": row["close"],
+            "volume": row["volume"],
+            "timestamp": int(row["timestamp"]),
+        }
 
 DEFAULT_END = date(2024, 1, 31)
 DEFAULT_START = DEFAULT_END - timedelta(days=359)
@@ -53,14 +62,14 @@ def ingest(
     for ticker in tickers:
         for bar in fetch_daily_bars(ticker, start, end):
             coll.update_one(
-                {"ticker": ticker, "ts_utc": int(bar.timestamp)},
+                {"ticker": ticker, "ts_utc": bar["timestamp"]},
                 {
                     "$set": {
-                        "open": float(bar.open),
-                        "high": float(bar.high),
-                        "low": float(bar.low),
-                        "close": float(bar.close),
-                        "volume": float(bar.volume),
+                        "open": float(bar["open"]),
+                        "high": float(bar["high"]),
+                        "low": float(bar["low"]),
+                        "close": float(bar["close"]),
+                        "volume": float(bar["volume"]),
                     }
                 },
                 upsert=True,

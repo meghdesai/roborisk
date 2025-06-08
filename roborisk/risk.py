@@ -1,7 +1,7 @@
 import csv
 from pymongo import MongoClient
 from datetime import datetime, timedelta
-
+from typing import Union
 import numpy as np
 
 from .config import get_settings
@@ -26,33 +26,46 @@ def _load_portfolio(path: str):
     return tickers, np.array(shares, dtype=float)
 
 
-def _get_returns_and_price(ticker: str, as_of_dt: datetime, lookback_days: int):
-    end_ts = int((as_of_dt + timedelta(days=1)).timestamp() * 1000)
+# risk.py  (replace the helper)
+def _get_returns_and_price(ticker: str,
+                           as_of_dt: datetime,
+                           lookback_days: int):
+    """
+    Return log-returns and close price *ending exactly on as_of_dt*.
+    The query window is [as_of_dt-lookback_days, as_of_dt] inclusive.
+    """
+    next_midnight = as_of_dt + timedelta(days=1)
+    end_exclusive = int(next_midnight.timestamp() * 1000)
+
     coll = _get_collection()
-    cursor = (
-        coll.find(
-            {"ticker": ticker, "ts_utc": {"$lte": end_ts}},
-            {"_id": 0, "ts_utc": 1, "close": 1},
-        )
-        .sort("ts_utc", -1)
-        .limit(lookback_days + 1)
+    cursor = (coll.find(
+        {"ticker": ticker, "ts_utc": {"$lt": end_exclusive}},
+        {"_id": 0, "ts_utc": 1, "close": 1},
     )
+    .sort("ts_utc", -1)
+    .limit(lookback_days + 1))
+
     rows = list(cursor)[::-1]
-    if len(rows) < lookback_days + 1:
-        raise ValueError(f"not enough data for {ticker}")
-    closes = np.array([r["close"] for r in rows], dtype=float)
+    must_have = int(as_of_dt.timestamp() * 1000)
+    if not rows or rows[-1]["ts_utc"] < must_have:
+        raise ValueError(f"no close for {ticker} on {as_of_dt.date()}")
+    closes = np.array([r["close"] for r in rows], float)
     returns = np.diff(np.log(closes))
     return returns, closes[-1]
 
 
 def monte_carlo_var(
     portfolio_path: str,
-    as_of: str = "2023-06-07",
+    as_of: Union[str, datetime] = "2023-06-07",   # <-- accept dt object too
     lookback_days: int = 60,
     simulations: int = 1000,
     alpha: float = 0.95,
 ):
-    as_of_dt = datetime.fromisoformat(as_of)
+    if isinstance(as_of, str):
+        as_of_dt = datetime.fromisoformat(as_of)
+    else:
+        as_of_dt = as_of
+        
     tickers, shares = _load_portfolio(portfolio_path)
 
     returns_list = []
